@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabaseClient";
-import { useRealtimeOrders } from "@/hooks/useRealtimeOrders";
+import { useRealtimeOrders, usePedidosDeliveryEnviados } from "@/hooks/useRealtimeOrders";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import type { TipoPedido } from "@/lib/types";
 
@@ -32,7 +32,7 @@ export default function CocinaPage() {
   const pedidosFiltrados = pedidos.filter((p) => p.tipo_pedido === tipo);
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen pb-16">
       <header className="px-4 pt-6 pb-2 flex items-center justify-between">
         <h1 className="font-display text-2xl">Cocina</h1>
         <div className="flex items-center gap-3">
@@ -62,14 +62,54 @@ export default function CocinaPage() {
         </button>
       </div>
 
-      {tipo === "delivery" && pedidosFiltrados.length === 0 ? (
-        <p className="text-center text-tinta/40 px-6 py-16">
-          Todavía no hay pedidos por delivery. Esta sección quedará lista para conectarse
-          con la futura app de repartidores.
-        </p>
-      ) : (
-        <KanbanBoard pedidos={pedidosFiltrados} onCambiarEstado={cambiarEstado} />
-      )}
+      <KanbanBoard pedidos={pedidosFiltrados} onCambiarEstado={cambiarEstado} />
+
+      {tipo === "delivery" && <PedidosEnviados />}
     </main>
+  );
+}
+
+function PedidosEnviados() {
+  const { pedidos, cargando } = usePedidosDeliveryEnviados();
+
+  return (
+    <section className="px-4 mt-4">
+      <h2 className="font-display text-lg mb-3">Pedidos enviados</h2>
+
+      {cargando && <p className="text-tinta/40 text-sm">Cargando…</p>}
+
+      {!cargando && pedidos.length === 0 && (
+        <p className="text-tinta/40 text-sm py-6">
+          Todavía no hay pedidos delivery enviados. En cuanto la app de repartidores esté
+          lista, aparecerán aquí con el nombre del cliente, su pedido y la dirección.
+        </p>
+      )}
+
+      <div className="flex flex-col gap-2">
+        {pedidos.map((pedido) => (
+          <div key={pedido.id} className="bg-arena rounded-2xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="font-medium">{pedido.nombre_cliente ?? "Cliente sin nombre"}</p>
+              <span className="text-xs text-tinta/50">
+                {new Date(pedido.created_at).toLocaleString("es-ES", {
+                  day: "numeric",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit"
+                })}
+              </span>
+            </div>
+            <ul className="text-sm mb-2">
+              {pedido.items_pedido?.map((item) => (
+                <li key={item.id}>
+                  {item.cantidad}x {item.nombre_producto}
+                </li>
+              ))}
+            </ul>
+            <p className="text-sm text-tinta/60">📍 {pedido.direccion_envio ?? "Sin dirección registrada"}</p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

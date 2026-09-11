@@ -55,7 +55,7 @@ export interface ItemPedido {
 
 export interface Pedido {
   id: string;
-  mesa_id: string;
+  mesa_id: string | null;
   estado: EstadoPedido;
   tipo_pedido: TipoPedido;
   total: number;
@@ -63,6 +63,8 @@ export interface Pedido {
   resumen_ia: string | null;
   metodo_pago: MetodoPago | null;
   pagado: boolean;
+  nombre_cliente: string | null;
+  direccion_envio: string | null;
   created_at: string;
   updated_at: string;
   items_pedido?: ItemPedido[];

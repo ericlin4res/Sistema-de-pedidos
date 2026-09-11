@@ -51,37 +51,55 @@ export function CartDrawer({
 
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
           {items.length === 0 && <p className="text-tinta/50 text-center py-8">Aún no has añadido nada.</p>}
-          {items.map((item) => (
-            <div key={item.producto_id} className="flex items-center gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="font-medium truncate">{item.nombre}</p>
-                <p className="text-sm text-tinta/60">{formatear(item.precio)}</p>
-              </div>
-              <div className="flex items-center gap-2">
+
+          {!resumen &&
+            items.map((item) => (
+              <div key={item.producto_id} className="flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">{item.nombre}</p>
+                  <p className="text-sm text-tinta/60">{formatear(item.precio)}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="focus-visible-ring w-8 h-8 rounded-full bg-arena text-lg"
+                    onClick={() => onCambiarCantidad(item.producto_id, item.cantidad - 1)}
+                    aria-label="Quitar una unidad"
+                  >
+                    −
+                  </button>
+                  <span className="w-5 text-center">{item.cantidad}</span>
+                  <button
+                    className="focus-visible-ring w-8 h-8 rounded-full bg-arena text-lg"
+                    onClick={() => onCambiarCantidad(item.producto_id, item.cantidad + 1)}
+                    aria-label="Añadir una unidad"
+                  >
+                    +
+                  </button>
+                </div>
                 <button
-                  className="focus-visible-ring w-8 h-8 rounded-full bg-arena text-lg"
-                  onClick={() => onCambiarCantidad(item.producto_id, item.cantidad - 1)}
-                  aria-label="Quitar una unidad"
+                  className="focus-visible-ring text-brasa text-sm ml-1"
+                  onClick={() => onQuitar(item.producto_id)}
                 >
-                  −
-                </button>
-                <span className="w-5 text-center">{item.cantidad}</span>
-                <button
-                  className="focus-visible-ring w-8 h-8 rounded-full bg-arena text-lg"
-                  onClick={() => onCambiarCantidad(item.producto_id, item.cantidad + 1)}
-                  aria-label="Añadir una unidad"
-                >
-                  +
+                  Quitar
                 </button>
               </div>
-              <button
-                className="focus-visible-ring text-brasa text-sm ml-1"
-                onClick={() => onQuitar(item.producto_id)}
-              >
-                Quitar
-              </button>
+            ))}
+
+          {/* Una vez la IA confirmó el pedido, se muestra solo de lectura.
+              La única forma de cambiarlo es tocando "Editar", que vuelve a
+              habilitar la lista de arriba y borra este resumen. */}
+          {resumen && (
+            <div className="flex flex-col gap-2">
+              {items.map((item) => (
+                <div key={item.producto_id} className="flex items-center justify-between text-sm">
+                  <span>
+                    {item.cantidad}x {item.nombre}
+                  </span>
+                  <span className="text-tinta/60">{formatear(item.precio * item.cantidad)}</span>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
 
         {resumen && (
@@ -116,7 +134,7 @@ export function CartDrawer({
                 onClick={() => setResumen(null)}
                 className="focus-visible-ring flex-1 py-3 rounded-full bg-arena text-tinta font-semibold"
               >
-                Editar
+                Editar pedido
               </button>
               <button
                 disabled={confirmando}
