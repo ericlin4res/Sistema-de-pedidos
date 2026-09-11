@@ -27,10 +27,7 @@ function LoginForm() {
     e.preventDefault();
     setCargando(true);
     setError(null);
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     setCargando(false);
     if (error) {
       console.error("Error de Supabase Auth:", error);

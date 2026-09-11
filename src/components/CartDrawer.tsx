@@ -12,7 +12,8 @@ export function CartDrawer({
   onQuitar,
   onRevisar,
   onEnviarPedido,
-  confirmando
+  confirmando,
+  error
 }: {
   abierto: boolean;
   onCerrar: () => void;
@@ -23,6 +24,7 @@ export function CartDrawer({
   onRevisar: () => Promise<{ resumen: string } | null>;
   onEnviarPedido: () => Promise<void>;
   confirmando: boolean;
+  error?: string | null;
 }) {
   const [resumen, setResumen] = useState<string | null>(null);
   const [pidiendoConfirmacion, setPidiendoConfirmacion] = useState(false);
@@ -86,6 +88,12 @@ export function CartDrawer({
           <div className="mx-4 mb-2 p-3 rounded-2xl bg-azafran/20 text-sm text-tinta">
             <p className="font-semibold mb-1">Antes de enviarlo a cocina, revisa:</p>
             <p className="whitespace-pre-line">{resumen}</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="mx-4 mb-2 p-3 rounded-2xl bg-brasa/15 text-sm text-brasa">
+            {error}
           </div>
         )}
 

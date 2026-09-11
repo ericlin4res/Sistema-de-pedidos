@@ -2,21 +2,39 @@
 
 import type { EstadoPedido } from "@/lib/types";
 
-const FASES: { estado: EstadoPedido; label: string }[] = [
-  { estado: "recibido", label: "Recibido" },
-  { estado: "en_preparacion", label: "En preparación" },
-  { estado: "listo", label: "Listo" },
-  { estado: "entregado", label: "Entregado" }
+const FASES: { estado: EstadoPedido; label: string; mensaje: string }[] = [
+  {
+    estado: "recibido",
+    label: "Recibido",
+    mensaje: "Ya avisamos a la cocina, en breve empiezan a prepararlo."
+  },
+  {
+    estado: "en_preparacion",
+    label: "En preparación",
+    mensaje: "Tu pedido se está cocinando ahora mismo."
+  },
+  {
+    estado: "listo",
+    label: "¡Listo!",
+    mensaje: "Tu pedido ya está listo. En breve un camarero te lo llevará a tu mesa."
+  },
+  {
+    estado: "entregado",
+    label: "Entregado",
+    mensaje: "¡Buen provecho!"
+  }
 ];
 
 export function OrderStatus({ estado, onNuevoPedido }: { estado: EstadoPedido; onNuevoPedido: () => void }) {
   const indiceActual = FASES.findIndex((f) => f.estado === estado);
+  const faseActual = FASES[indiceActual] ?? FASES[0];
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 gap-8 text-center">
       <div>
         <p className="text-tinta/50 mb-1">Tu pedido está en camino</p>
-        <h1 className="font-display text-2xl">{FASES[indiceActual]?.label ?? "Recibido"}</h1>
+        <h1 className="font-display text-2xl mb-2">{faseActual.label}</h1>
+        <p className="text-tinta/70 max-w-xs mx-auto">{faseActual.mensaje}</p>
       </div>
 
       <ol className="w-full max-w-xs flex flex-col gap-4">

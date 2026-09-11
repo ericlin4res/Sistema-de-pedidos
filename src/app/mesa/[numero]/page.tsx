@@ -22,6 +22,7 @@ export default function MesaPage() {
   const [pedidoId, setPedidoId] = useState<string | null>(null);
   const [estadoPedido, setEstadoPedido] = useState<EstadoPedido | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
 
   const cart = useCart(codigoMesa);
@@ -90,19 +91,29 @@ export default function MesaPage() {
   async function enviarPedido() {
     if (!mesa) return;
     setEnviando(true);
-    const res = await fetch("/api/pedidos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mesa_id: mesa.id, items: cart.items })
-    });
-    setEnviando(false);
-    if (!res.ok) return;
-    const pedido = await res.json();
-    window.localStorage.setItem(`pedido-activo:${codigoMesa}`, pedido.id);
-    setPedidoId(pedido.id);
-    setEstadoPedido("recibido");
-    cart.vaciar();
-    setCarritoAbierto(false);
+    setErrorEnvio(null);
+    try {
+      const res = await fetch("/api/pedidos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mesa_id: mesa.id, items: cart.items })
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setErrorEnvio(data?.error ?? "No se pudo enviar el pedido. Inténtalo de nuevo.");
+        return;
+      }
+      const pedido = await res.json();
+      window.localStorage.setItem(`pedido-activo:${codigoMesa}`, pedido.id);
+      setPedidoId(pedido.id);
+      setEstadoPedido("recibido");
+      cart.vaciar();
+      setCarritoAbierto(false);
+    } catch {
+      setErrorEnvio("No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.");
+    } finally {
+      setEnviando(false);
+    }
   }
 
   function nuevoPedido() {
@@ -164,6 +175,7 @@ export default function MesaPage() {
         onRevisar={revisarPedido}
         onEnviarPedido={enviarPedido}
         confirmando={enviando}
+        error={errorEnvio}
       />
     </div>
   );
