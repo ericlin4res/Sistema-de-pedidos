@@ -77,6 +77,8 @@ create table public.pedidos (
   total numeric(10,2) not null default 0,
   nota_cliente text,
   resumen_ia text, -- texto que generó el agente de confirmación
+  metodo_pago text check (metodo_pago in ('efectivo', 'tarjeta')),
+  pagado boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -99,6 +101,7 @@ create table public.items_pedido (
 -- ------------------------------------------------------------
 create index idx_pedidos_estado on public.pedidos(estado);
 create index idx_pedidos_mesa on public.pedidos(mesa_id);
+create index idx_pedidos_pagado on public.pedidos(pagado);
 create index idx_items_pedido on public.items_pedido(pedido_id);
 create index idx_productos_categoria on public.productos(categoria_id);
 

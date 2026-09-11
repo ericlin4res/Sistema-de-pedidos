@@ -8,6 +8,7 @@ import { MenuList } from "@/components/MenuList";
 import { CartDrawer } from "@/components/CartDrawer";
 import { CartIcon } from "@/components/CartIcon";
 import { OrderStatus } from "@/components/OrderStatus";
+import { PaymentFlow } from "@/components/PaymentFlow";
 import type { Categoria, EstadoPedido, Mesa, Producto } from "@/lib/types";
 
 export default function MesaPage() {
@@ -19,10 +20,17 @@ export default function MesaPage() {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [carritoAbierto, setCarritoAbierto] = useState(false);
+
   const [pedidoId, setPedidoId] = useState<string | null>(null);
   const [estadoPedido, setEstadoPedido] = useState<EstadoPedido | null>(null);
+  const [pedidoTotal, setPedidoTotal] = useState(0);
+  const [pedidoPagado, setPedidoPagado] = useState(false);
+  const [pasoPago, setPasoPago] = useState(false); // true = ya se confirmó "entregado", mostrando cómo pagar
+
   const [enviando, setEnviando] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
+  const [confirmandoEntrega, setConfirmandoEntrega] = useState(false);
+  const [procesandoPago, setProcesandoPago] = useState(false);
   const [cargando, setCargando] = useState(true);
 
   const cart = useCart(codigoMesa);
@@ -58,8 +66,19 @@ export default function MesaPage() {
     if (!pedidoId) return;
 
     async function traerEstado() {
-      const { data } = await supabase.from("pedidos").select("estado").eq("id", pedidoId).single();
-      if (data) setEstadoPedido(data.estado);
+      const { data } = await supabase
+        .from("pedidos")
+        .select("estado, total, pagado")
+        .eq("id", pedidoId)
+        .single();
+      if (!data) return;
+      setEstadoPedido(data.estado);
+      setPedidoTotal(data.total);
+      setPedidoPagado(data.pagado);
+      // Si recargó la página justo después de confirmar "entregado" pero
+      // antes de pagar, lo mandamos directo a la pantalla de pago.
+      if (data.estado === "entregado" && !data.pagado) setPasoPago(true);
+      if (data.pagado) liberarMesa();
     }
     traerEstado();
 
@@ -68,7 +87,11 @@ export default function MesaPage() {
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "pedidos", filter: `id=eq.${pedidoId}` },
-        (payload) => setEstadoPedido(payload.new.estado as EstadoPedido)
+        (payload) => {
+          setEstadoPedido(payload.new.estado as EstadoPedido);
+          setPedidoTotal(payload.new.total as number);
+          setPedidoPagado(payload.new.pagado as boolean);
+        }
       )
       .subscribe();
 
@@ -107,6 +130,8 @@ export default function MesaPage() {
       window.localStorage.setItem(`pedido-activo:${codigoMesa}`, pedido.id);
       setPedidoId(pedido.id);
       setEstadoPedido("recibido");
+      setPedidoTotal(pedido.total);
+      setPedidoPagado(false);
       cart.vaciar();
       setCarritoAbierto(false);
     } catch {
@@ -116,10 +141,49 @@ export default function MesaPage() {
     }
   }
 
-  function nuevoPedido() {
+  // El cliente confirma que el camarero ya le llevó la comida a la mesa.
+  async function confirmarEntrega() {
+    if (!pedidoId) return;
+    setConfirmandoEntrega(true);
+    try {
+      const res = await fetch(`/api/pedidos/${pedidoId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estado: "entregado" })
+      });
+      if (res.ok) {
+        setEstadoPedido("entregado");
+        setPasoPago(true);
+      }
+    } finally {
+      setConfirmandoEntrega(false);
+    }
+  }
+
+  // Pago en efectivo: se registra y se libera la mesa para el próximo cliente.
+  async function confirmarPagoEfectivo() {
+    if (!pedidoId) return;
+    setProcesandoPago(true);
+    try {
+      await fetch(`/api/pedidos/${pedidoId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ metodo_pago: "efectivo", pagado: true })
+      });
+      liberarMesa();
+    } finally {
+      setProcesandoPago(false);
+    }
+  }
+
+  // Limpia todo el estado local para que la próxima persona que escanee
+  // este QR (en este mismo dispositivo) empiece de cero con el menú.
+  function liberarMesa() {
     window.localStorage.removeItem(`pedido-activo:${codigoMesa}`);
     setPedidoId(null);
     setEstadoPedido(null);
+    setPasoPago(false);
+    setPedidoPagado(false);
   }
 
   if (cargando) {
@@ -134,8 +198,18 @@ export default function MesaPage() {
     );
   }
 
+  if (pedidoId && pasoPago && !pedidoPagado) {
+    return <PaymentFlow total={pedidoTotal} onConfirmarEfectivo={confirmarPagoEfectivo} procesando={procesandoPago} />;
+  }
+
   if (pedidoId && estadoPedido) {
-    return <OrderStatus estado={estadoPedido} onNuevoPedido={nuevoPedido} />;
+    return (
+      <OrderStatus
+        estado={estadoPedido}
+        onConfirmarEntrega={confirmarEntrega}
+        confirmandoEntrega={confirmandoEntrega}
+      />
+    );
   }
 
   return (

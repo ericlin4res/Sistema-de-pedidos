@@ -25,7 +25,15 @@ const FASES: { estado: EstadoPedido; label: string; mensaje: string }[] = [
   }
 ];
 
-export function OrderStatus({ estado, onNuevoPedido }: { estado: EstadoPedido; onNuevoPedido: () => void }) {
+export function OrderStatus({
+  estado,
+  onConfirmarEntrega,
+  confirmandoEntrega
+}: {
+  estado: EstadoPedido;
+  onConfirmarEntrega: () => void;
+  confirmandoEntrega: boolean;
+}) {
   const indiceActual = FASES.findIndex((f) => f.estado === estado);
   const faseActual = FASES[indiceActual] ?? FASES[0];
 
@@ -55,12 +63,13 @@ export function OrderStatus({ estado, onNuevoPedido }: { estado: EstadoPedido; o
         })}
       </ol>
 
-      {estado === "entregado" && (
+      {estado === "listo" && (
         <button
-          onClick={onNuevoPedido}
-          className="focus-visible-ring px-6 py-3 rounded-full bg-basil text-white font-semibold"
+          disabled={confirmandoEntrega}
+          onClick={onConfirmarEntrega}
+          className="focus-visible-ring px-6 py-3 rounded-full bg-basil text-white font-semibold disabled:opacity-50"
         >
-          Hacer otro pedido
+          {confirmandoEntrega ? "Confirmando…" : "Ya me lo entregaron"}
         </button>
       )}
     </div>

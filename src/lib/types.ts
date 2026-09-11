@@ -1,4 +1,5 @@
 export type EstadoPedido = "recibido" | "en_preparacion" | "listo" | "entregado";
+export type MetodoPago = "efectivo" | "tarjeta";
 
 export interface Categoria {
   id: string;
@@ -50,6 +51,8 @@ export interface Pedido {
   total: number;
   nota_cliente: string | null;
   resumen_ia: string | null;
+  metodo_pago: MetodoPago | null;
+  pagado: boolean;
   created_at: string;
   updated_at: string;
   items_pedido?: ItemPedido[];

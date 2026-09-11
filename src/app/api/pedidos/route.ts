@@ -21,7 +21,11 @@ export async function POST(req: NextRequest) {
     .in("id", ids);
 
   if (errorProductos || !productosDb) {
-    return NextResponse.json({ error: "No se pudieron validar los productos" }, { status: 500 });
+    console.error("Error validando productos:", errorProductos);
+    return NextResponse.json(
+      { error: errorProductos?.message ?? "No se pudieron validar los productos" },
+      { status: 500 }
+    );
   }
 
   const disponibles = productosDb.filter((p) => !p.agotado);
@@ -44,7 +48,11 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (errorPedido || !pedido) {
-    return NextResponse.json({ error: "No se pudo crear el pedido" }, { status: 500 });
+    console.error("Error creando pedido:", errorPedido);
+    return NextResponse.json(
+      { error: errorPedido?.message ?? "No se pudo crear el pedido" },
+      { status: 500 }
+    );
   }
 
   const filasItems = items.map((item) => {
@@ -61,7 +69,8 @@ export async function POST(req: NextRequest) {
 
   const { error: errorItems } = await supabase.from("items_pedido").insert(filasItems);
   if (errorItems) {
-    return NextResponse.json({ error: "No se pudieron guardar los items del pedido" }, { status: 500 });
+    console.error("Error guardando items del pedido:", errorItems);
+    return NextResponse.json({ error: errorItems.message }, { status: 500 });
   }
 
   return NextResponse.json(pedido, { status: 201 });

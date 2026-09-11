@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabaseClient";
+import { AdminNav } from "@/components/AdminNav";
 import { ProductForm } from "@/components/ProductForm";
 import { ProductTable } from "@/components/ProductTable";
 import type { Categoria, Producto } from "@/lib/types";
@@ -43,8 +44,10 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="min-h-screen px-4 pt-6 pb-16 max-w-2xl mx-auto">
-      <header className="flex items-center justify-between mb-4">
+    <main className="min-h-screen pb-16 max-w-2xl mx-auto">
+      <AdminNav />
+      <div className="px-4">
+      <header className="flex items-center justify-between mt-4 mb-4">
         <h1 className="font-display text-2xl">Productos</h1>
         {!mostrarForm && (
           <button
@@ -80,6 +83,7 @@ export default function AdminPage() {
         onEliminar={eliminar}
         onToggleAgotado={toggleAgotado}
       />
+      </div>
     </main>
   );
 }
