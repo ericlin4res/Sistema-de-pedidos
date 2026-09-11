@@ -1,5 +1,14 @@
 export type EstadoPedido = "recibido" | "en_preparacion" | "listo" | "entregado";
 export type MetodoPago = "efectivo" | "tarjeta";
+export type TipoPedido = "local" | "delivery";
+export type RolUsuario = "admin" | "cocina";
+
+export interface Perfil {
+  id: string;
+  email?: string;
+  nombre: string | null;
+  rol: RolUsuario;
+}
 
 export interface Categoria {
   id: string;
@@ -48,6 +57,7 @@ export interface Pedido {
   id: string;
   mesa_id: string;
   estado: EstadoPedido;
+  tipo_pedido: TipoPedido;
   total: number;
   nota_cliente: string | null;
   resumen_ia: string | null;

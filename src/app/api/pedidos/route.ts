@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
 
   const { data: pedido, error: errorPedido } = await supabase
     .from("pedidos")
-    .insert({ mesa_id, total, estado: "recibido" })
+    .insert({ mesa_id, total, estado: "recibido", tipo_pedido: "local" })
     .select()
     .single();
 

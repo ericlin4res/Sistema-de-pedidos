@@ -9,41 +9,54 @@ Supabase (Postgres + Auth + Realtime) y Tailwind CSS.
 ```
 qr-restaurant/
 ├── supabase/
-│   └── schema.sql              # Tablas, RLS, triggers y datos de ejemplo
+│   ├── schema.sql                # Tablas, RLS, triggers y datos de ejemplo
+│   ├── migracion_pagos.sql       # Añade metodo_pago/pagado (proyectos ya creados)
+│   └── migracion_roles_delivery.sql  # Añade tipo_pedido + bootstrap de admin
 ├── src/
 │   ├── app/
 │   │   ├── layout.tsx           # Layout raíz (fuentes, estilos globales)
 │   │   ├── page.tsx             # Landing simple
-│   │   ├── login/page.tsx       # Login del equipo (cocina/admin)
+│   │   ├── login/page.tsx       # Login del equipo, redirige según el rol
 │   │   ├── mesa/[numero]/       # Web del cliente: /mesa/mesa-3
 │   │   │   └── page.tsx
-│   │   ├── cocina/page.tsx      # Panel Kanban (protegido)
-│   │   ├── admin/page.tsx       # CRUD de productos (protegido)
+│   │   ├── cocina/page.tsx      # Kanban (protegido) con pestañas Local/Delivery
+│   │   ├── admin/
+│   │   │   ├── page.tsx         # CRUD de productos (protegido, rol admin)
+│   │   │   ├── mesas/page.tsx   # Alta/baja de mesas + QR descargable
+│   │   │   ├── ventas/page.tsx  # Ventas por día + productos vendidos
+│   │   │   └── cuenta/page.tsx  # Cambiar contraseña + gestionar cocineros
 │   │   └── api/
 │   │       ├── pedidos/route.ts         # POST crear pedido, GET listar
-│   │       ├── pedidos/[id]/route.ts    # PATCH cambiar estado (Kanban)
+│   │       ├── pedidos/[id]/route.ts    # PATCH estado / método de pago
 │   │       ├── productos/route.ts       # GET listar, POST crear
 │   │       ├── productos/[id]/route.ts  # PATCH editar/agotar, DELETE (soft)
-│   │       ├── mesas/route.ts           # GET/POST mesas (para imprimir QRs)
+│   │       ├── mesas/route.ts           # GET listar, POST crear (admin)
+│   │       ├── mesas/[id]/route.ts      # PATCH/DELETE (admin)
+│   │       ├── usuarios/route.ts        # GET/POST cocineros (admin)
+│   │       ├── usuarios/[id]/route.ts   # DELETE cocinero (admin)
 │   │       └── ia/confirmar/route.ts    # Agente que resume el pedido
 │   ├── components/
 │   │   ├── CartIcon.tsx          # Ícono "plato con tapa" hecho a mano en SVG
 │   │   ├── MenuList.tsx          # Menú + filtros por categoría
 │   │   ├── CartDrawer.tsx        # Carrito deslizante + paso de confirmación
 │   │   ├── OrderStatus.tsx       # Pantalla de fases del pedido
-│   │   ├── KanbanBoard.tsx       # 3 columnas de cocina
+│   │   ├── PaymentFlow.tsx       # Elegir método de pago y confirmar efectivo
+│   │   ├── KanbanBoard.tsx       # Columnas de cocina
 │   │   ├── KanbanCard.tsx        # Tarjeta de pedido individual
 │   │   ├── ProductForm.tsx       # Alta/edición de producto
-│   │   └── ProductTable.tsx      # Listado con acciones (editar/agotar/borrar)
+│   │   ├── ProductTable.tsx      # Listado con acciones (editar/agotar/borrar)
+│   │   ├── MesaCard.tsx          # Tarjeta de mesa con QR y botón de descarga
+│   │   └── AdminNav.tsx          # Pestañas del panel de administración
 │   ├── hooks/
 │   │   ├── useCart.ts            # Carrito con localStorage por mesa
 │   │   └── useRealtimeOrders.ts  # Suscripción en vivo para cocina
 │   ├── lib/
 │   │   ├── supabaseClient.ts     # Cliente para el navegador (anon key)
 │   │   ├── supabaseServer.ts     # Cliente para API routes (service role)
+│   │   ├── authServer.ts         # Lee usuario + rol desde las cookies (API routes)
 │   │   └── types.ts              # Tipos compartidos
 │   ├── styles/globals.css
-│   └── middleware.ts             # Protege /cocina y /admin con sesión
+│   └── middleware.ts             # Protege /cocina y /admin según sesión y rol
 ├── package.json
 ├── tailwind.config.js
 ├── .env.example
@@ -102,10 +115,21 @@ acaba un plato a media noche sin tener que editarlo entero.
 
 1. Crea un proyecto en [supabase.com](https://supabase.com).
 2. Ve a **SQL Editor** → pega el contenido de `supabase/schema.sql` → Run.
-3. En **Authentication → Users**, crea manualmente un usuario para cocina y
-   otro para administración (email + contraseña), y opcionalmente añade una
-   fila en `perfiles` con su `rol`.
-4. En **Project Settings → API**, copia:
+3. Corre también `supabase/migracion_pagos.sql` y `supabase/migracion_roles_delivery.sql`
+   (si empiezas un proyecto desde cero, ya están incluidos en `schema.sql`; estos
+   archivos sueltos son solo para actualizar un proyecto que ya tenías corriendo).
+4. **Crea tu primer usuario admin** (paso obligatorio, una sola vez):
+   - Ve a **Authentication → Users → Add user**, crea tu cuenta con email/contraseña,
+     y marca "Auto Confirm User".
+   - Copia su **User UID**.
+   - En el SQL Editor, corre:
+     ```sql
+     insert into public.perfiles (id, rol, nombre)
+     values ('PEGA-AQUI-TU-USER-UID', 'admin', 'Tu nombre');
+     ```
+   - A partir de aquí, ya no necesitas volver a tocar SQL: desde **Cuenta → Cocineros**
+     dentro del panel de administración puedes crear las cuentas del personal de cocina.
+5. En **Project Settings → API**, copia:
    - `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`
    - `anon public key` → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `service_role key` → `SUPABASE_SERVICE_ROLE_KEY` (¡nunca la expongas al navegador!)
@@ -117,9 +141,8 @@ acaba un plato a media noche sin tener que editarlo entero.
 3. En **Environment Variables**, añade las 3 variables de Supabase (y
    `ANTHROPIC_API_KEY` si quieres el resumen con IA real).
 4. Deploy. Next.js se detecta automáticamente.
-5. Genera los QR: cada mesa apunta a `https://tu-dominio.vercel.app/mesa/mesa-N`
-   (puedes generarlos con cualquier generador de QR gratuito, o crear luego un
-   botón en `/admin` que los genere e imprima).
+5. Entra a `/login` con tu cuenta admin, y desde **Mesas** crea tus mesas y descarga
+   sus QR directamente (ya no hace falta generarlos a mano).
 
 ### 4.3 Desarrollo local
 
@@ -133,9 +156,16 @@ npm run dev
 
 **Fase 0 — MVP (este entregable)**
 - Menú digital con filtros, carrito, confirmación con IA, tracker de estado.
-- Kanban de cocina en tiempo real.
+- Kanban de cocina en tiempo real, separado en pedidos del Local y Delivery
+  (Delivery queda listo para conectarse a una futura app de repartidores).
 - CRUD de productos con "agotado" y borrado lógico.
-- Auth simple (email/password) para cocina y admin.
+- Roles reales con Supabase Auth: admin y cocina, cada uno con su panel.
+- Panel de administración: productos, mesas (con generación y descarga de QR),
+  ventas por día (con productos y cantidades vendidas), y gestión de cuenta
+  (cambiar contraseña, crear/eliminar cocineros).
+- Flujo de entrega y pago: el cliente confirma "ya me lo entregaron", elige
+  efectivo (con confirmación) o tarjeta (aviso de "próximamente"), y la mesa
+  queda lista para el siguiente cliente.
 
 **Fase 1 — Pulido de producto**
 - Animaciones de transición (carrito, cambios de fase, drag entre columnas).
@@ -145,9 +175,13 @@ npm run dev
 - Sonido/vibración en la tablet de cocina cuando llega un pedido nuevo.
 
 **Fase 2 — Pagos y notificaciones**
-- Integración de pagos (Stripe / Redsys) antes o después de comer.
+- Integración de pagos (Stripe / Redsys) antes o después de comer — ahora mismo
+  la opción "Tarjeta" ya está en la UI, solo falta conectarla a un proveedor real.
 - Notificaciones push al cliente cuando su pedido esté "Listo".
 - Botón de "llamar al camarero" desde la web del cliente.
+- App Android para repartidores de Delivery, que cree pedidos con
+  `tipo_pedido = 'delivery'` y aparezcan en la pestaña correspondiente de cocina
+  (la base de datos y el Kanban ya están preparados para esto).
 
 **Fase 3 — Multi-restaurante**
 - Añadir `restaurante_id` a mesas/productos/pedidos y filtrar todo por

@@ -9,6 +9,7 @@ interface GrupoDia {
   etiqueta: string; // texto legible, ej. "lunes, 9 de septiembre"
   pedidos: Pedido[];
   total: number;
+  productos: { nombre: string; cantidad: number }[];
 }
 
 const formateador = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" });
@@ -26,11 +27,24 @@ function agruparPorDia(pedidos: Pedido[]): GrupoDia[] {
     });
 
     if (!mapa.has(clave)) {
-      mapa.set(clave, { fecha: clave, etiqueta, pedidos: [], total: 0 });
+      mapa.set(clave, { fecha: clave, etiqueta, pedidos: [], total: 0, productos: [] });
     }
     const grupo = mapa.get(clave)!;
     grupo.pedidos.push(pedido);
     grupo.total += pedido.total;
+  }
+
+  // Cantidad vendida por producto, calculada aparte para cada día.
+  for (const grupo of mapa.values()) {
+    const conteo = new Map<string, number>();
+    for (const pedido of grupo.pedidos) {
+      for (const item of pedido.items_pedido ?? []) {
+        conteo.set(item.nombre_producto, (conteo.get(item.nombre_producto) ?? 0) + item.cantidad);
+      }
+    }
+    grupo.productos = Array.from(conteo.entries())
+      .map(([nombre, cantidad]) => ({ nombre, cantidad }))
+      .sort((a, b) => b.cantidad - a.cantidad);
   }
 
   return Array.from(mapa.values()).sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
@@ -80,6 +94,21 @@ export default function VentasPage() {
               <h2 className="font-display text-lg capitalize">{grupo.etiqueta}</h2>
               <span className="font-semibold text-basil">{formateador.format(grupo.total)}</span>
             </div>
+
+            {grupo.productos.length > 0 && (
+              <div className="bg-white/60 rounded-xl p-3 mb-3">
+                <p className="text-xs uppercase tracking-wide text-tinta/40 mb-2">Productos vendidos</p>
+                <ul className="flex flex-col gap-1">
+                  {grupo.productos.map((p) => (
+                    <li key={p.nombre} className="flex items-center justify-between text-sm">
+                      <span>{p.nombre}</span>
+                      <span className="font-medium text-tinta/70">x{p.cantidad}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <ul className="flex flex-col gap-2">
               {grupo.pedidos
                 .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))

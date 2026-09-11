@@ -1,9 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
-// Protege /cocina y /admin: solo usuarios autenticados pueden entrar.
-// El control fino de rol (admin vs cocina) se hace dentro de cada página,
-// aquí solo verificamos que haya sesión.
+// Protege /cocina y /admin: solo usuarios autenticados Y con el rol
+// correcto (guardado en la tabla `perfiles`) pueden entrar a cada uno.
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
 
@@ -21,16 +20,43 @@ export async function middleware(req: NextRequest) {
     }
   );
 
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session }
+  } = await supabase.auth.getSession();
 
-  const rutaProtegida =
-    req.nextUrl.pathname.startsWith("/cocina") || req.nextUrl.pathname.startsWith("/admin");
+  const esRutaAdmin = req.nextUrl.pathname.startsWith("/admin");
+  const esRutaCocina = req.nextUrl.pathname.startsWith("/cocina");
 
-  if (rutaProtegida && !session) {
+  if (!session && (esRutaAdmin || esRutaCocina)) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("volver", req.nextUrl.pathname);
     return NextResponse.redirect(url);
+  }
+
+  if (session && (esRutaAdmin || esRutaCocina)) {
+    const { data: perfil } = await supabase
+      .from("perfiles")
+      .select("rol")
+      .eq("id", session.user.id)
+      .single();
+
+    const rol = perfil?.rol;
+
+    // Sin perfil asignado: no sabemos qué panel le corresponde.
+    if (!rol) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("error", "sin-rol");
+      return NextResponse.redirect(url);
+    }
+
+    // Cocina no puede entrar a Admin. Admin sí puede entrar a Cocina.
+    if (esRutaAdmin && rol !== "admin") {
+      const url = req.nextUrl.clone();
+      url.pathname = "/cocina";
+      return NextResponse.redirect(url);
+    }
   }
 
   return res;

@@ -20,21 +20,47 @@ function LoginForm() {
   const params = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    params.get("error") === "sin-rol"
+      ? "Tu cuenta todavía no tiene un rol asignado. Pide a un administrador que te dé de alta."
+      : null
+  );
   const [cargando, setCargando] = useState(false);
 
   async function entrar(e: React.FormEvent) {
     e.preventDefault();
     setCargando(true);
     setError(null);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setCargando(false);
-    if (error) {
-      console.error("Error de Supabase Auth:", error);
-      setError(error.message);
+
+    const { error: errorLogin } = await supabase.auth.signInWithPassword({ email, password });
+    if (errorLogin) {
+      setCargando(false);
+      console.error("Error de Supabase Auth:", errorLogin);
+      setError(errorLogin.message);
       return;
     }
-    router.push(params.get("volver") ?? "/admin");
+
+    // Tras iniciar sesión, redirige según el rol guardado en `perfiles`.
+    const {
+      data: { user }
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setCargando(false);
+      setError("No se pudo verificar tu sesión, inténtalo de nuevo.");
+      return;
+    }
+
+    const { data: perfil } = await supabase.from("perfiles").select("rol").eq("id", user.id).single();
+    setCargando(false);
+
+    if (!perfil?.rol) {
+      setError("Tu cuenta todavía no tiene un rol asignado. Pide a un administrador que te dé de alta.");
+      return;
+    }
+
+    const destino = params.get("volver") ?? (perfil.rol === "admin" ? "/admin" : "/cocina");
+    router.push(destino);
     router.refresh();
   }
 

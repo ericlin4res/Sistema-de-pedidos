@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabaseServer";
+import { obtenerPerfilActual } from "@/lib/authServer";
 
-// GET /api/mesas -> lista de mesas (para que admin genere/imprima los QR)
+// GET /api/mesas -> lista de mesas (para que admin gestione y genere los QR)
 export async function GET() {
   const supabase = createServiceClient();
   const { data, error } = await supabase.from("mesas").select("*").order("numero");
@@ -11,9 +12,17 @@ export async function GET() {
 
 // POST /api/mesas -> crear una mesa nueva con su código de QR
 export async function POST(req: NextRequest) {
-  const { numero }: { numero: number } = await req.json();
-  const supabase = createServiceClient();
+  const perfilActual = await obtenerPerfilActual();
+  if (perfilActual?.rol !== "admin") {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
 
+  const { numero }: { numero: number } = await req.json();
+  if (!numero || numero <= 0) {
+    return NextResponse.json({ error: "Número de mesa inválido" }, { status: 400 });
+  }
+
+  const supabase = createServiceClient();
   const { data, error } = await supabase
     .from("mesas")
     .insert({ numero, codigo_qr: `mesa-${numero}` })
