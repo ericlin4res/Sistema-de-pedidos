@@ -1,0 +1,170 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import { createClient } from "@/lib/supabaseClient";
+import { useCart } from "@/hooks/useCart";
+import { MenuList } from "@/components/MenuList";
+import { CartDrawer } from "@/components/CartDrawer";
+import { CartIcon } from "@/components/CartIcon";
+import { OrderStatus } from "@/components/OrderStatus";
+import type { Categoria, EstadoPedido, Mesa, Producto } from "@/lib/types";
+
+export default function MesaPage() {
+  const params = useParams<{ numero: string }>();
+  const codigoMesa = params.numero; // slug de la URL, ej. "mesa-3"
+  const supabase = createClient();
+
+  const [mesa, setMesa] = useState<Mesa | null>(null);
+  const [productos, setProductos] = useState<Producto[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [carritoAbierto, setCarritoAbierto] = useState(false);
+  const [pedidoId, setPedidoId] = useState<string | null>(null);
+  const [estadoPedido, setEstadoPedido] = useState<EstadoPedido | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  const [cargando, setCargando] = useState(true);
+
+  const cart = useCart(codigoMesa);
+
+  // Carga inicial: mesa, menú y si ya había un pedido activo guardado localmente
+  useEffect(() => {
+    async function cargar() {
+      const { data: mesaData } = await supabase
+        .from("mesas")
+        .select("*")
+        .eq("codigo_qr", codigoMesa)
+        .single();
+      setMesa(mesaData);
+
+      const { data: cats } = await supabase.from("categorias").select("*");
+      setCategorias(cats ?? []);
+
+      const { data: prods } = await supabase.from("productos").select("*").eq("activo", true);
+      setProductos(prods ?? []);
+
+      const pedidoGuardado = window.localStorage.getItem(`pedido-activo:${codigoMesa}`);
+      if (pedidoGuardado) {
+        setPedidoId(pedidoGuardado);
+      }
+      setCargando(false);
+    }
+    cargar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codigoMesa]);
+
+  // Suscripción en tiempo real al estado del pedido activo
+  useEffect(() => {
+    if (!pedidoId) return;
+
+    async function traerEstado() {
+      const { data } = await supabase.from("pedidos").select("estado").eq("id", pedidoId).single();
+      if (data) setEstadoPedido(data.estado);
+    }
+    traerEstado();
+
+    const canal = supabase
+      .channel(`pedido-${pedidoId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "pedidos", filter: `id=eq.${pedidoId}` },
+        (payload) => setEstadoPedido(payload.new.estado as EstadoPedido)
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(canal);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedidoId]);
+
+  async function revisarPedido(): Promise<{ resumen: string } | null> {
+    const res = await fetch("/api/ia/confirmar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: cart.items })
+    });
+    if (!res.ok) return null;
+    return res.json();
+  }
+
+  async function enviarPedido() {
+    if (!mesa) return;
+    setEnviando(true);
+    const res = await fetch("/api/pedidos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mesa_id: mesa.id, items: cart.items })
+    });
+    setEnviando(false);
+    if (!res.ok) return;
+    const pedido = await res.json();
+    window.localStorage.setItem(`pedido-activo:${codigoMesa}`, pedido.id);
+    setPedidoId(pedido.id);
+    setEstadoPedido("recibido");
+    cart.vaciar();
+    setCarritoAbierto(false);
+  }
+
+  function nuevoPedido() {
+    window.localStorage.removeItem(`pedido-activo:${codigoMesa}`);
+    setPedidoId(null);
+    setEstadoPedido(null);
+  }
+
+  if (cargando) {
+    return <div className="min-h-screen flex items-center justify-center text-tinta/50">Cargando menú…</div>;
+  }
+
+  if (!mesa) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-6 text-center text-tinta/60">
+        No encontramos esta mesa. Comprueba el código QR o avisa a un camarero.
+      </div>
+    );
+  }
+
+  if (pedidoId && estadoPedido) {
+    return <OrderStatus estado={estadoPedido} onNuevoPedido={nuevoPedido} />;
+  }
+
+  return (
+    <div className="pb-28">
+      <header className="px-4 pt-6 pb-2">
+        <p className="text-tinta/50">Mesa {mesa.numero}</p>
+        <h1 className="font-display text-2xl">Nuestro menú</h1>
+      </header>
+
+      <MenuList
+        productos={productos}
+        categorias={categorias}
+        onAgregar={(p) =>
+          cart.agregar({ producto_id: p.id, nombre: p.nombre, precio: p.precio, foto_url: p.foto_url })
+        }
+      />
+
+      {cart.cantidadTotal > 0 && (
+        <button
+          onClick={() => setCarritoAbierto(true)}
+          className="focus-visible-ring fixed bottom-5 left-1/2 -translate-x-1/2 bg-tinta text-crema rounded-full pl-4 pr-5 py-3 flex items-center gap-3 shadow-lg"
+        >
+          <CartIcon count={cart.cantidadTotal} />
+          <span className="font-semibold">
+            {cart.total.toLocaleString("es-ES", { style: "currency", currency: "EUR" })}
+          </span>
+        </button>
+      )}
+
+      <CartDrawer
+        abierto={carritoAbierto}
+        onCerrar={() => setCarritoAbierto(false)}
+        items={cart.items}
+        total={cart.total}
+        onCambiarCantidad={cart.cambiarCantidad}
+        onQuitar={cart.quitar}
+        onRevisar={revisarPedido}
+        onEnviarPedido={enviarPedido}
+        confirmando={enviando}
+      />
+    </div>
+  );
+}

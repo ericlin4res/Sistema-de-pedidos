@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-fraunces: "Fraunces", serif;
+  --font-worksans: "Work Sans", sans-serif;
+}
+
+body {
+  background-color: #FBF7EF;
+  color: #20241F;
+}
+
+/* Respeta preferencia de movimiento reducido */
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+
+.focus-visible-ring:focus-visible {
+  outline: 3px solid #2F5233;
+  outline-offset: 2px;
+}

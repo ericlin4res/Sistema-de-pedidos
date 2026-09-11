@@ -1,0 +1,14 @@
+# Variables locales y secretos
+.env
+.env.local
+.env.*.local
+
+# Permite la plantilla segura
+!.env.example
+
+# Next.js
+.next/
+out/
+
+# Dependencias
+node_modules/
